@@ -25,6 +25,7 @@ Green Model Advisor helps you:
 - **SQLAlchemy 2.0.23** - SQL toolkit and ORM for database operations
 - **SQLite** - Lightweight database for estimates and conversations
 - **Pydantic 2.5.0** - Data validation and serialization
+- **Pytorch** - Used Pytorch for good orchestration
 
 ### **AI/ML Models**
 - **Google Gemini 2.0 Flash** - Advanced text generation via `google-generativeai` 0.3.0
