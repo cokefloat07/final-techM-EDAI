@@ -750,12 +750,11 @@
 @media print {
   .auth-container {
     display: none;
-  }
-}
-  border-color: #10a37f;
-  background: #1f2f1f;
-  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.2);
-}
+  
+  border-color: #10a37f;        
+  background: #1f2f1f;           
+  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.2);  
+}}
 
 .container.dark .form-group small {
   color: #999;
