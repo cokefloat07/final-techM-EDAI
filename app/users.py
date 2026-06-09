@@ -8,10 +8,17 @@ import uuid
 import hashlib
 import json
 
-from .database import (
-    get_db, User, Chat, 
-    UserRegisterRequest, UserLoginRequest, UserResponse,
-    ChatRequest, ChatResponse, ChatMessage
+# ✅ Database models (SQLAlchemy ORM)
+from .database import get_db, User, Chat
+
+# ✅ Pydantic schemas (request/response models)
+from .models import (
+    UserRegisterRequest,
+    UserLoginRequest,
+    UserResponse,
+    ChatRequest,
+    ChatResponse,
+    ChatMessage
 )
 
 router = APIRouter(prefix="/api", tags=["users", "chats"])
@@ -30,7 +37,6 @@ def verify_password(password: str, password_hash: str) -> bool:
 @router.post("/auth/register", response_model=UserResponse)
 async def register(request: UserRegisterRequest, db: Session = Depends(get_db)):
     """Register a new user"""
-    # Check if user already exists
     existing_user = db.query(User).filter(User.email == request.email).first()
     if existing_user:
         raise HTTPException(
@@ -38,7 +44,6 @@ async def register(request: UserRegisterRequest, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
-    # Create new user
     password_hash = hash_password(request.password)
     user = User(
         email=request.email,
@@ -83,7 +88,6 @@ async def create_chat(request: ChatRequest, user_id: int = Query(...), db: Sessi
     
     print(f"Creating chat for user {user_id}, title: {request.title}")
     
-    # Verify user exists
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
@@ -93,7 +97,6 @@ async def create_chat(request: ChatRequest, user_id: int = Query(...), db: Sessi
     
     chat_id = str(uuid.uuid4())
     
-    # Handle messages - they can be ChatMessage objects or dicts
     messages_data = request.messages or []
     try:
         if messages_data:
@@ -112,7 +115,6 @@ async def create_chat(request: ChatRequest, user_id: int = Query(...), db: Sessi
         user_id=user_id,
         title=request.title or "New Chat",
         messages=messages_json,
-        # Populate metadata fields
         total_requests=request.total_requests or 0,
         user_prompts=request.user_prompts or [],
         models_used=request.models_used or [],
@@ -140,7 +142,6 @@ async def create_chat(request: ChatRequest, user_id: int = Query(...), db: Sessi
             detail=f"Failed to create chat: {str(e)}"
         )
     
-    # Parse messages back for response
     if isinstance(chat.messages, str):
         try:
             chat.messages = json.loads(chat.messages)
@@ -157,7 +158,6 @@ async def get_user_chats(user_id: int, db: Session = Depends(get_db)):
     chats = db.query(Chat).filter(Chat.user_id == user_id).all()
     print(f"Found {len(chats)} chats for user {user_id}")
     
-    # Parse messages for each chat
     for chat in chats:
         if isinstance(chat.messages, str):
             try:
@@ -211,15 +211,12 @@ async def update_chat(
             detail="Chat not found"
         )
     
-    # Update title if provided
     if request.title:
         chat.title = request.title
     
-    # Update messages - normalize and save as-is
     if request.messages:
         try:
             messages_data = request.messages
-            # Ensure each message has required fields
             normalized_messages = []
             for msg in messages_data:
                 if isinstance(msg, dict):
@@ -237,11 +234,9 @@ async def update_chat(
             print(f"Error normalizing messages: {e}")
             chat.messages = json.dumps([])
     else:
-        # If messages is empty, try to preserve existing messages
         if not chat.messages:
             chat.messages = json.dumps([])
     
-    # Update metadata fields
     if request.total_requests is not None:
         chat.total_requests = request.total_requests
     if request.user_prompts:
@@ -320,7 +315,6 @@ async def get_user_stats(user_id: int, db: Session = Depends(get_db)):
             detail="User not found"
         )
     
-    # Get chat count and message count
     chats = db.query(Chat).filter(Chat.user_id == user_id).all()
     total_chats = len(chats)
     total_messages = 0
