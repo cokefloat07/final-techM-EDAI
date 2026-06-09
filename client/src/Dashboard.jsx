@@ -15,56 +15,83 @@ const Dashboard = ({ estimates = [] }) => {
   useEffect(() => {
     if (estimates && estimates.length > 0) {
       calculateStats();
+    } else {
+      setStats({
+        totalRequests: 0,
+        totalCarbon: 0,
+        averageAccuracy: 0,
+        totalEnergy: 0,
+        modelBreakdown: {},
+        topModels: []
+      });
     }
   }, [estimates]);
 
   const calculateStats = () => {
     console.log('Estimates received in Dashboard:', estimates);
-    
-    // Normalize all input data to ensure proper types
-    const normalizedEstimates = estimates.map(e => {
-      // Handle accuracy from multiple possible locations
-      let accuracy = 0;
-      if (e.accuracy !== undefined && e.accuracy !== null && e.accuracy !== 0) {
-        accuracy = parseFloat(e.accuracy);
-      } else if (e.overall_accuracy !== undefined && e.overall_accuracy !== null && e.overall_accuracy !== 0) {
-        accuracy = parseFloat(e.overall_accuracy);
-      } else if (e.accuracy_scores?.overall_accuracy !== undefined && e.accuracy_scores.overall_accuracy !== null) {
-        accuracy = parseFloat(e.accuracy_scores.overall_accuracy);
-      }
-      
-      return {
-        id: e.id,
-        model_name: e.model_name || e.model || "unknown",
-        carbon_emitted_kgco2: parseFloat(e.carbon || e.carbon_emitted_kgco2 || 0),
-        energy_consumed_kwh: parseFloat(e.energy || e.energy_consumed_kwh || 0),
-        overall_accuracy: accuracy >= 0 && accuracy <= 100 ? accuracy : 0,
-        accuracy_scores: e.accuracy_scores || null,
-        tokens: parseInt(e.tokens || 0)
-      };
-    }).filter(e => e.carbon_emitted_kgco2 > 0 || e.overall_accuracy > 0 || e.tokens > 0);  // Filter out empty estimates
-    
-    console.log('Normalized estimates:', normalizedEstimates);
-    
-    const totalRequests = normalizedEstimates.length;
-    const totalCarbon = normalizedEstimates.reduce((sum, e) => sum + (e.carbon_emitted_kgco2 || 0), 0);
-    const totalEnergy = normalizedEstimates.reduce((sum, e) => sum + (e.energy_consumed_kwh || 0), 0);
-    
-    // Extract accuracy values
-    const validAccuracies = normalizedEstimates
-      .map(e => e.overall_accuracy)
-      .filter(acc => acc > 0 && acc <= 100);
-    
-    const averageAccuracy = validAccuracies.length > 0 
-      ? validAccuracies.reduce((sum, acc) => sum + acc, 0) / validAccuracies.length 
-      : 0;
 
-    // Calculate model breakdown with normalized data
+    const normalizedEstimates = estimates
+      .map((e) => {
+        let accuracy = 0;
+
+        if (e.accuracy !== undefined && e.accuracy !== null && e.accuracy !== 0) {
+          accuracy = parseFloat(e.accuracy);
+        } else if (
+          e.overall_accuracy !== undefined &&
+          e.overall_accuracy !== null &&
+          e.overall_accuracy !== 0
+        ) {
+          accuracy = parseFloat(e.overall_accuracy);
+        } else if (
+          e.accuracy_scores?.overall_accuracy !== undefined &&
+          e.accuracy_scores?.overall_accuracy !== null
+        ) {
+          accuracy = parseFloat(e.accuracy_scores.overall_accuracy);
+        }
+
+        return {
+          id: e.id,
+          model_name: e.model_name || e.model || 'unknown',
+          carbon_emitted_kgco2: parseFloat(e.carbon || e.carbon_emitted_kgco2 || 0),
+          energy_consumed_kwh: parseFloat(e.energy || e.energy_consumed_kwh || 0),
+          overall_accuracy: accuracy >= 0 && accuracy <= 100 ? accuracy : 0,
+          accuracy_scores: e.accuracy_scores || null,
+          tokens: parseInt(e.tokens || 0)
+        };
+      })
+      .filter(
+        (e) =>
+          e.carbon_emitted_kgco2 > 0 ||
+          e.overall_accuracy > 0 ||
+          e.tokens > 0
+      );
+
+    console.log('Normalized estimates:', normalizedEstimates);
+
+    const totalRequests = normalizedEstimates.length;
+    const totalCarbon = normalizedEstimates.reduce(
+      (sum, e) => sum + (e.carbon_emitted_kgco2 || 0),
+      0
+    );
+    const totalEnergy = normalizedEstimates.reduce(
+      (sum, e) => sum + (e.energy_consumed_kwh || 0),
+      0
+    );
+
+    const validAccuracies = normalizedEstimates
+      .map((e) => e.overall_accuracy)
+      .filter((acc) => acc > 0 && acc <= 100);
+
+    const averageAccuracy =
+      validAccuracies.length > 0
+        ? validAccuracies.reduce((sum, acc) => sum + acc, 0) / validAccuracies.length
+        : 0;
+
     const modelBreakdown = {};
-    
-    normalizedEstimates.forEach(e => {
+
+    normalizedEstimates.forEach((e) => {
       const modelName = e.model_name;
-      
+
       if (!modelBreakdown[modelName]) {
         modelBreakdown[modelName] = {
           count: 0,
@@ -74,28 +101,17 @@ const Dashboard = ({ estimates = [] }) => {
           accuracyCount: 0
         };
       }
+
       modelBreakdown[modelName].count += 1;
       modelBreakdown[modelName].totalCarbon += e.carbon_emitted_kgco2 || 0;
       modelBreakdown[modelName].totalEnergy += e.energy_consumed_kwh || 0;
-      
-      // Handle accuracy
+
       if (e.overall_accuracy > 0 && e.overall_accuracy <= 100) {
         modelBreakdown[modelName].totalAccuracy += e.overall_accuracy;
         modelBreakdown[modelName].accuracyCount += 1;
       }
     });
-      let accuracy = e.overall_accuracy;
-      if (accuracy === undefined || accuracy === null || accuracy === 0) {
-        accuracy = e.accuracy_scores?.overall_accuracy;
-      }
-      
-      if (accuracy && accuracy >= 0 && accuracy <= 100) {
-        modelBreakdown[modelName].totalAccuracy += accuracy;
-        modelBreakdown[modelName].accuracyCount += 1;
-      }
-    });
 
-    // Get top models by usage - normalized and sorted
     const topModels = Object.entries(modelBreakdown)
       .map(([name, data]) => ({
         name,
@@ -106,7 +122,7 @@ const Dashboard = ({ estimates = [] }) => {
         accuracyAvg: data.accuracyCount > 0 ? data.totalAccuracy / data.accuracyCount : 0
       }))
       .sort((a, b) => b.count - a.count);
-    
+
     console.log('Model Breakdown keys:', Object.keys(modelBreakdown));
     console.log('Top Models:', topModels);
 
@@ -121,19 +137,17 @@ const Dashboard = ({ estimates = [] }) => {
   };
 
   const formatCarbonKg = (kg) => {
-    if (!kg || isNaN(kg)) return "0.00";
+    if (!kg || isNaN(kg)) return '0.00';
     return (kg * 1000000).toFixed(2);
   };
-  
+
   const formatEnergy = (kwh) => {
-    if (!kwh || isNaN(kwh)) return "0.00";
+    if (!kwh || isNaN(kwh)) return '0.00';
     return (kwh * 1000 * 3600).toFixed(2);
   };
-  
+
   const formatPercentage = (val) => {
-    if (!val || isNaN(val)) return "0.00";
-    // If value is already 0-100 (accuracy from evaluator), don't multiply
-    // If it's 0-1 (rare case), multiply by 100
+    if (!val || isNaN(val)) return '0.00';
     if (val > 1) {
       return val.toFixed(1);
     } else {
@@ -197,7 +211,9 @@ const Dashboard = ({ estimates = [] }) => {
                   <div className="model-stat">
                     <span className="stat-label">🌱 CO₂/Request:</span>
                     <strong>{formatCarbonKg(model.carbonPerRequest)} μg</strong>
-                    <span className="stat-detail">({model.carbonPerRequest.toFixed(8)} kg)</span>
+                    <span className="stat-detail">
+                      ({model.carbonPerRequest.toFixed(8)} kg)
+                    </span>
                   </div>
                   <div className="model-stat">
                     <span className="stat-label">🌍 Total CO₂:</span>
