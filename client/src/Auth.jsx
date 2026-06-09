@@ -33,8 +33,6 @@ const Auth = ({ onAuthSuccess }) => {
     setLoading(true);
 
     try {
-      const API_BASE_URL = "http://localhost:8000";
-
       if (isLogin) {
         // LOGIN
         if (!formData.email || !formData.password) {

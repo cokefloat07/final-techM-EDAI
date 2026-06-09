@@ -158,9 +158,6 @@ const calculateChatStatistics = (chat) => {
 };
 
 const ChatCarbon = ({ user, onLogout }) => {
-  // API Configuration
-  const API_BASE_URL = "http://localhost:8000";
-  
   // State Management
   const [input, setInput] = useState("");
   const [selectedModels, setSelectedModels] = useState(["gemini-2.0-flash"]);
