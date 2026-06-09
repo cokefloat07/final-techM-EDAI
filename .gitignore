@@ -1,70 +1,35 @@
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv
-
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+
+# Databases
+*.db
+green_model_advisor.db
+carbon_estimates.db
+
+# Logs
+*.log
+backend.log
+server.log
+server.err
+
+# CodeCarbon
+codecarbon_output/
+emissions.csv
+
+# Node
+node_modules/
+client/node_modules/
+client/dist/
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
 .DS_Store
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Logs
-*.log
-logs/
-server.err
-
-# Node
-node_modules/
-npm-debug.log
-yarn-error.log
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+# Test files
 test.txt
-
-# Code Carbon
-codecarbon_output/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Project specific
-*.tmp
-temp/

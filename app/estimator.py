@@ -1,6 +1,5 @@
 import time
 import os
-from codecarbon import EmissionsTracker
 from typing import Dict, Any, Tuple
 from sqlalchemy.orm import Session
 import json
@@ -8,6 +7,18 @@ import json
 from .database import CarbonEstimate
 from .model_api_client import model_api_client
 from .config import settings
+
+# 🔧 PRODUCTION FIX: Safely import CodeCarbon (may fail on some cloud environments)
+try:
+    from codecarbon import EmissionsTracker
+    CODECARBON_AVAILABLE = True
+    print("✅ CodeCarbon loaded successfully")
+except Exception as e:
+    print(f"⚠️ CodeCarbon not available: {e}")
+    print("⚠️ Will use token-based estimation fallback")
+    CODECARBON_AVAILABLE = False
+    EmissionsTracker = None
+
 
 class CarbonEstimator:
     def __init__(self):
@@ -17,22 +28,38 @@ class CarbonEstimator:
     def estimate_with_codecarbon(self, prompt: str, model_name: str, 
                                simulate: bool = True, max_tokens: int = None) -> Dict[str, Any]:
         """
-        Estimate carbon emissions using CodeCarbon tracker with actual model API calls
+        Estimate carbon emissions using CodeCarbon tracker with actual model API calls.
+        Falls back to token-based estimation if CodeCarbon is unavailable.
         """
-        # Create output directory for CodeCarbon
-        os.makedirs("./codecarbon_output", exist_ok=True)
-        
-        # Start CodeCarbon tracker
-        tracker = EmissionsTracker(
-            project_name=f"model-inference-{model_name}",
-            measure_power_secs=1,
-            output_dir="./codecarbon_output",
-            log_level="ERROR"  # Reduce verbosity
-        )
+        # 🔧 Use settings for output directory (handles production vs dev)
+        output_dir = settings.CODECARBON_OUTPUT_DIR
         
         try:
-            tracker.start()
-            
+            os.makedirs(output_dir, exist_ok=True)
+        except Exception as e:
+            print(f"⚠️ Could not create CodeCarbon output dir: {e}")
+            output_dir = "/tmp"  # fallback
+        
+        tracker = None
+        emissions_kg = 0.0
+        
+        # 🔧 Only start tracker if CodeCarbon is available
+        if CODECARBON_AVAILABLE:
+            try:
+                tracker = EmissionsTracker(
+                    project_name=f"model-inference-{model_name}",
+                    measure_power_secs=1,
+                    output_dir=output_dir,
+                    log_level="ERROR",
+                    save_to_file=False,  # 🔧 Don't write CSV files in production
+                    tracking_mode="machine"
+                )
+                tracker.start()
+            except Exception as e:
+                print(f"⚠️ CodeCarbon initialization failed: {e}")
+                tracker = None
+        
+        try:
             # Call model API
             response_text, metadata, inference_time_ms = self.model_api_client.call_model(
                 model_name, 
@@ -40,7 +67,12 @@ class CarbonEstimator:
             )
             
             # Stop tracker and get emissions
-            emissions_kg = tracker.stop()
+            if tracker is not None:
+                try:
+                    emissions_kg = tracker.stop()
+                except Exception as e:
+                    print(f"⚠️ CodeCarbon stop failed: {e}")
+                    emissions_kg = 0.0
             
             # For CodeCarbon v2, we get direct emissions in kgCO2
             carbon_kgco2 = emissions_kg if emissions_kg else 0.0
@@ -48,11 +80,13 @@ class CarbonEstimator:
             # Estimate energy from carbon and grid intensity
             energy_kwh = carbon_kgco2 / settings.DEFAULT_GRID_INTENSITY if carbon_kgco2 > 0 else 0.0
             
-            # If CodeCarbon doesn't provide reliable data, use token-based estimation
-            # Threshold: 0.000000001 kg (1 nanogram) - if CodeCarbon gives less, it's unreliable
-            # Also apply fallback if we have significant tokens but CodeCarbon reports zero
+            # 🔧 Always fallback to token-based if CodeCarbon unavailable or unreliable
             has_significant_tokens = metadata.get("total_tokens", 0) > 10
-            codecarbon_unreliable = carbon_kgco2 < 0.000000001 or (carbon_kgco2 == 0 and has_significant_tokens)
+            codecarbon_unreliable = (
+                not CODECARBON_AVAILABLE 
+                or carbon_kgco2 < 0.000000001 
+                or (carbon_kgco2 == 0 and has_significant_tokens)
+            )
             
             if codecarbon_unreliable:
                 energy_kwh, carbon_kgco2 = self.estimate_from_tokens(
@@ -83,10 +117,13 @@ class CarbonEstimator:
             return result
             
         except Exception as e:
-            try:
-                tracker.stop()
-            except:
-                pass
+            # 🔧 Make sure tracker is stopped even on error
+            if tracker is not None:
+                try:
+                    tracker.stop()
+                except:
+                    pass
+            print(f"❌ Carbon estimation error for {model_name}: {e}")
             raise e
     
     def estimate_from_tokens(self, total_tokens: int, model_name: str) -> Tuple[float, float]:
@@ -95,7 +132,7 @@ class CarbonEstimator:
         Returns: (energy_kwh, carbon_kgco2)
         """
         model_config = self.model_config.get(model_name, {})
-        energy_per_token = model_config.get("energy_per_token", 0.00001)  # kWh per token
+        energy_per_token = model_config.get("energy_per_token", 0.00001)
         
         energy_kwh = total_tokens * energy_per_token
         carbon_kgco2 = energy_kwh * settings.DEFAULT_GRID_INTENSITY
@@ -107,7 +144,6 @@ class CarbonEstimator:
         """
         Save carbon estimate to database with optional accuracy scores
         """
-        # Convert accuracy_scores dict to JSON string for storage
         accuracy_json = json.dumps(accuracy_scores) if accuracy_scores else None
         
         db_estimate = CarbonEstimate(
@@ -124,7 +160,7 @@ class CarbonEstimator:
             estimation_method=estimate_data["estimation_method"],
             country_iso_code=estimate_data.get("country_iso_code", "IND"),
             grid_intensity=estimate_data.get("grid_intensity", 0.708),
-            accuracy_scores=None  # Will be set separately if needed
+            accuracy_scores=None
         )
         
         db.add(db_estimate)
@@ -140,5 +176,6 @@ class CarbonEstimator:
     def check_api_keys(self) -> Dict[str, bool]:
         """Check which API keys are configured"""
         return self.model_api_client.validate_api_keys()
+
 
 carbon_estimator = CarbonEstimator()

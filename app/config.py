@@ -8,20 +8,36 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 class Settings:
+    # 🔧 PRODUCTION FIX: Use environment-aware database path
+    # On Render, use /tmp directory (writable in free tier)
+    IS_PRODUCTION = os.getenv("RENDER", False) or os.getenv("PRODUCTION", False)
+    
+    if IS_PRODUCTION:
+        DEFAULT_DB_PATH = "/tmp/green_model_advisor.db"
+    else:
+        DEFAULT_DB_PATH = str(BASE_DIR / "green_model_advisor.db")
+    
     # Database
-    DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/green_model_advisor.db")
+    DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
+    
+    # 🔧 Frontend URL for CORS (used in main.py)
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
     
     # API Keys
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
     HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "")
-    OPENROUTER_API_KEY = os.getenv("OPEN_ROUTER", "")
-    GROQ_API_KEY = os.getenv("groq", "")
+    OPENROUTER_API_KEY = os.getenv("OPEN_ROUTER", "") or os.getenv("OPENROUTER_API_KEY", "")
+    GROQ_API_KEY = os.getenv("groq", "") or os.getenv("GROQ_API_KEY", "")
     NVIDIA_NIM_API_KEY = os.getenv("NVIDIA_NIM_API_KEY", "")
+    NVIDIA_NIM_URL = os.getenv("NVIDIA_NIM_URL", "https://integrate.api.nvidia.com/v1")
     
     # Carbon Estimation - India specific
-    DEFAULT_GRID_INTENSITY = float(os.getenv("GRID_INTENSITY", "0.708"))  # India grid intensity kgCO2/kWh
+    DEFAULT_GRID_INTENSITY = float(os.getenv("GRID_INTENSITY", "0.708"))
     DEFAULT_COUNTRY_ISO_CODE = os.getenv("COUNTRY_ISO_CODE", "IND")
+    
+    # 🔧 CodeCarbon output directory (use /tmp on production)
+    CODECARBON_OUTPUT_DIR = "/tmp/codecarbon_output" if IS_PRODUCTION else "./codecarbon_output"
     
     # Model Configuration with API Provider Details
     MODEL_CONFIG = {

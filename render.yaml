@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: green-model-advisor-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PRODUCTION
+        value: "true"
+      - key: DATABASE_URL
+        value: sqlite:////tmp/green_model_advisor.db
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: OPEN_ROUTER
+        sync: false
+      - key: NVIDIA_NIM_API_KEY
+        sync: false
+      - key: NVIDIA_NIM_URL
+        sync: false
+      - key: HUGGINGFACE_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

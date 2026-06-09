@@ -1,4 +1,4 @@
-
+import os
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -39,10 +39,27 @@ app = FastAPI(
     version="3.0.0"
 )
 
-# CORS middleware
+# ============================================
+# 🔧 PRODUCTION CORS CONFIGURATION
+# ============================================
+# Get frontend URL from environment variable
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# Build allowed origins list
+allowed_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:5174",
+    FRONTEND_URL,
+]
+
+# Remove duplicates and empty strings
+allowed_origins = list(set(filter(None, allowed_origins)))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow all Vercel preview deployments
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -51,23 +68,40 @@ app.add_middleware(
 # Include user and chat routes
 app.include_router(users_routes.router)
 
-# Create database tables on startup
+# ============================================
+# 🔧 STARTUP EVENT
+# ============================================
 @app.on_event("startup")
 async def startup_event():
     try:
-        print("Creating database tables...")
+        print("=" * 50)
+        print("🚀 Green Model Advisor API Starting...")
+        print("=" * 50)
+        print(f"📍 Frontend URL: {FRONTEND_URL}")
+        print(f"📍 Allowed Origins: {allowed_origins}")
+        print("📦 Creating database tables...")
         create_tables()
-        print("Database tables created successfully")
+        print("✅ Database tables created successfully")
+        print("✅ API is ready to accept requests")
+        print("=" * 50)
     except Exception as e:
-        print(f"Error during startup: {e}")
+        print(f"❌ Error during startup: {e}")
         import traceback
         traceback.print_exc()
+
+
+# ============================================
+# 🔧 HEALTH CHECK ENDPOINTS (REQUIRED FOR RENDER)
+# ============================================
 @app.get("/")
 async def root():
     return {
         "message": "Green Model Advisor Smart Model Selection & Carbon Estimation API",
         "version": "3.0.0",
+        "status": "running",
         "endpoints": {
+            "health": "/health",
+            "docs": "/docs",
             "estimate": "/estimate",
             "estimates": "/estimates",
             "models": "/models",
@@ -75,9 +109,23 @@ async def root():
             "accuracy": "/accuracy/analyze",
             "performance": "/performance/models",
             "conversations": "/conversations",
-            "recommendations": "/recommendations/models"
+            "recommendations": "/recommendations/models",
+            "compare": "/compare-models"
         }
     }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Render and monitoring services"""
+    return {
+        "status": "healthy",
+        "service": "Green Model Advisor API",
+        "version": "3.0.0"
+    }
+
+# ============================================
+# YOUR EXISTING ROUTES (UNCHANGED)
+# ============================================
 
 @app.post("/estimate")
 async def create_carbon_estimate(
@@ -256,8 +304,6 @@ async def get_model_recommendations(request: ModelRecommendationRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Recommendation failed: {str(e)}")
-
-# ... (keep all existing endpoints from previous version)
 
 @app.get("/performance/models", response_model=Dict[str, ModelPerformanceMetrics])
 async def get_model_performance(db: Session = Depends(get_db)):
@@ -502,6 +548,10 @@ def generate_recommendations(accuracy_scores: Dict, validation_results: Dict) ->
     
     return recommendations
 
+# ============================================
+# 🔧 PRODUCTION-READY ENTRY POINT
+# ============================================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from './api';
 import React, { useState, useEffect } from 'react';
 import './Dashboard.css';
 
